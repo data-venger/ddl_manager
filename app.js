@@ -201,13 +201,25 @@ class DDLExplorer {
     async fetchGitTree(owner, repo, branch, pat, apiUrl) {
         // Clean URL trailing slash
         const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-        const url = `${baseUrl}/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
         
-        const headers = {
-            'Accept': 'application/vnd.github.v3+json'
-        };
-        if (pat) {
-            headers['Authorization'] = `token ${pat}`;
+        const isAzure = baseUrl.toLowerCase().includes('dev.azure.com') || baseUrl.toLowerCase().includes('visualstudio.com');
+        
+        let url;
+        const headers = {};
+        
+        if (isAzure) {
+            // Azure DevOps Git Items REST API (get flat list of items recursively)
+            url = `${baseUrl}/_apis/git/repositories/${repo}/items?recursionLevel=full&versionDescriptor.version=${branch}&api-version=6.0`;
+            if (pat) {
+                headers['Authorization'] = `Basic ${btoa(':' + pat)}`;
+            }
+        } else {
+            // GitHub REST API
+            url = `${baseUrl}/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+            headers['Accept'] = 'application/vnd.github.v3+json';
+            if (pat) {
+                headers['Authorization'] = `token ${pat}`;
+            }
         }
 
         const response = await fetch(url, { headers });
@@ -215,17 +227,32 @@ class DDLExplorer {
             if (response.status === 401) {
                 throw new Error('Unauthorized. Check if your Personal Access Token (PAT) is correct.');
             } else if (response.status === 404) {
-                throw new Error('Repository or Branch not found. Make sure the owner, repository name, and branch are exact.');
+                throw new Error('Repository or Branch not found. Make sure the repository name and branch are exact.');
             } else {
                 throw new Error(`HTTP ${response.status} - ${response.statusText}`);
             }
         }
         
         const data = await response.json();
-        if (!data.tree || !Array.isArray(data.tree)) {
-            throw new Error('Could not read file tree from GitHub API response.');
+        
+        if (isAzure) {
+            // Map Azure DevOps response items to the GitHub tree schema expected by parseAndLoadTree
+            if (!data.value || !Array.isArray(data.value)) {
+                throw new Error('Could not read file list from Azure DevOps API.');
+            }
+            return data.value
+                .filter(item => !item.isFolder)
+                .map(item => ({
+                    path: item.path.startsWith('/') ? item.path.substring(1) : item.path,
+                    type: 'blob',
+                    sha: item.objectId
+                }));
+        } else {
+            if (!data.tree || !Array.isArray(data.tree)) {
+                throw new Error('Could not read file tree from GitHub API response.');
+            }
+            return data.tree;
         }
-        return data.tree;
     }
 
     async fetchRepositoryCatalog() {
@@ -563,13 +590,24 @@ class DDLExplorer {
 
     async fetchFileContentFromGitHub(path) {
         const baseUrl = this.config.apiUrl.endsWith('/') ? this.config.apiUrl.slice(0, -1) : this.config.apiUrl;
-        const url = `${baseUrl}/repos/${this.config.owner}/${this.config.repo}/contents/${path}?ref=${this.config.branch}`;
+        const isAzure = baseUrl.toLowerCase().includes('dev.azure.com') || baseUrl.toLowerCase().includes('visualstudio.com');
         
-        const headers = {
-            'Accept': 'application/vnd.github.v3.raw' // Returns raw text instead of JSON
-        };
-        if (this.config.pat) {
-            headers['Authorization'] = `token ${this.config.pat}`;
+        let url;
+        const headers = {};
+        
+        if (isAzure) {
+            // Azure DevOps Raw Item Contents API
+            url = `${baseUrl}/_apis/git/repositories/${this.config.repo}/items?path=${encodeURIComponent('/' + path)}&versionDescriptor.version=${this.config.branch}&$format=text&api-version=6.0`;
+            if (this.config.pat) {
+                headers['Authorization'] = `Basic ${btoa(':' + this.config.pat)}`;
+            }
+        } else {
+            // GitHub Raw API
+            url = `${baseUrl}/repos/${this.config.owner}/${this.config.repo}/contents/${path}?ref=${this.config.branch}`;
+            headers['Accept'] = 'application/vnd.github.v3.raw';
+            if (this.config.pat) {
+                headers['Authorization'] = `token ${this.config.pat}`;
+            }
         }
 
         const response = await fetch(url, { headers });
