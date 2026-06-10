@@ -778,18 +778,28 @@ class DDLExplorer {
             this.showToast('SQL DDL copied to clipboard!');
             
             // Visual feedback on button
-            const icon = this.btnCopyCode.querySelector('i');
+            const icon = this.btnCopyCode.querySelector('i, svg');
             const label = this.btnCopyCode.querySelector('span');
             
-            icon.setAttribute('data-lucide', 'check');
-            label.textContent = 'Copied!';
+            if (icon) {
+                icon.setAttribute('data-lucide', 'check');
+            }
+            if (label) {
+                label.textContent = 'Copied!';
+            }
             this.btnCopyCode.style.borderColor = 'var(--color-success)';
             this.btnCopyCode.style.color = 'var(--color-success)';
             lucide.createIcons();
 
             setTimeout(() => {
-                icon.setAttribute('data-lucide', 'copy');
-                label.textContent = 'Copy SQL';
+                const currentIcon = this.btnCopyCode.querySelector('i, svg');
+                const currentLabel = this.btnCopyCode.querySelector('span');
+                if (currentIcon) {
+                    currentIcon.setAttribute('data-lucide', 'copy');
+                }
+                if (currentLabel) {
+                    currentLabel.textContent = 'Copy SQL';
+                }
                 this.btnCopyCode.style.borderColor = '';
                 this.btnCopyCode.style.color = '';
                 lucide.createIcons();
