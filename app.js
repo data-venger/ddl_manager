@@ -318,6 +318,7 @@ class DDLExplorer {
         // Render Tree in Sidebar
         this.renderTree(this.treeData);
         
+        this.treeEmpty.style.display = 'none';
         this.treeLoading.style.display = 'none';
         this.catalogTree.style.display = 'block';
         
