@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snowflake DDL Explorer</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PrismJS for SQL syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <link href="styles.css" rel="stylesheet" />
+</head>
+<body>
+    <div id="app" class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i data-lucide="database" class="logo-icon"></i>
+                    <span>DDL Explorer</span>
+                </div>
+                <button id="btn-settings" class="icon-btn" title="GitHub Settings">
+                    <i data-lucide="settings"></i>
+                </button>
+            </div>
+
+            <!-- Search and Filter Panel -->
+            <div class="search-panel">
+                <div class="search-wrapper">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="search-input" placeholder="Search DDLs..." autocomplete="off">
+                    <button id="btn-clear-search" class="clear-btn" style="display: none;">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div class="filter-group">
+                    <select id="filter-env" class="filter-select">
+                        <option value="">All Env/DBs</option>
+                    </select>
+                    <select id="filter-type" class="filter-select">
+                        <option value="">All Types</option>
+                        <option value="TABLES">Tables</option>
+                        <option value="VIEWS">Views</option>
+                        <option value="SPs">SPs</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Navigation Tree -->
+            <div class="tree-container">
+                <div id="tree-loading" class="loading-state" style="display: none;">
+                    <div class="spinner"></div>
+                    <span>Loading repository catalog...</span>
+                </div>
+                <div id="tree-empty" class="empty-state">
+                    <i data-lucide="folder-open"></i>
+                    <p>No repository loaded.</p>
+                    <button id="btn-load-config" class="primary-btn">Configure GitHub</button>
+                </div>
+                <nav id="catalog-tree" class="catalog-tree" style="display: none;"></nav>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Welcome / Configuration Needed Screen -->
+            <div id="view-setup" class="content-view active">
+                <div class="welcome-card">
+                    <div class="welcome-icon-wrapper">
+                        <i data-lucide="github" class="welcome-icon"></i>
+                    </div>
+                    <h1>Welcome to DDL Explorer</h1>
+                    <p>Connect to your personal GitHub repository containing the Snowflake DDL SQL files. Browse, search, and view your table, view, and stored procedure definitions instantly.</p>
+                    
+                    <div class="setup-features">
+                        <div class="feature-item">
+                            <i data-lucide="search" class="feature-icon"></i>
+                            <div>
+                                <h3>Instant Search</h3>
+                                <p>Search by object names across all databases and schemas.</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <i data-lucide="folder-tree" class="feature-icon"></i>
+                            <div>
+                                <h3>Catalog Tree View</h3>
+                                <p>Navigate through Database -> Schema -> Type folders naturally.</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <i data-lucide="copy" class="feature-icon"></i>
+                            <div>
+                                <h3>Copy with One Click</h3>
+                                <p>Quickly copy syntax-highlighted DDL code to your clipboard.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="btn-setup-github" class="primary-btn large-btn">
+                        <i data-lucide="link"></i> Connect GitHub Repo
+                    </button>
+                </div>
+            </div>
+
+            <!-- SQL Code Viewer Screen -->
+            <div id="view-code" class="content-view">
+                <header class="view-header">
+                    <div class="object-info">
+                        <div class="breadcrumbs" id="code-breadcrumbs">
+                            <span class="crumb">DEV_DB</span>
+                            <span class="separator">/</span>
+                            <span class="crumb">SALES</span>
+                            <span class="separator">/</span>
+                            <span class="crumb-type">TABLES</span>
+                            <span class="separator">/</span>
+                            <span class="crumb-active">CUSTOMERS.sql</span>
+                        </div>
+                        <h2 id="code-title">CUSTOMERS</h2>
+                    </div>
+                    <div class="actions">
+                        <button id="btn-copy-code" class="secondary-btn" title="Copy DDL Code">
+                            <i data-lucide="copy"></i>
+                            <span>Copy SQL</span>
+                        </button>
+                        <a id="link-github" href="#" target="_blank" class="secondary-btn" title="Open in GitHub">
+                            <i data-lucide="external-link"></i>
+                            <span>GitHub</span>
+                        </a>
+                    </div>
+                </header>
+
+                <div class="code-container">
+                    <div id="code-loading" class="code-overlay" style="display: none;">
+                        <div class="spinner"></div>
+                        <span>Fetching DDL content...</span>
+                    </div>
+                    <div id="code-error" class="code-overlay" style="display: none;">
+                        <i data-lucide="alert-circle" class="error-icon"></i>
+                        <span id="code-error-msg">Failed to load DDL.</span>
+                        <button id="btn-retry-code" class="secondary-btn">Retry</button>
+                    </div>
+                    <pre><code class="language-sql" id="sql-code">-- SQL code will load here</code></pre>
+                </div>
+            </div>
+        </main>
+
+        <!-- Settings Modal Dialog -->
+        <div id="settings-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>GitHub Repository Integration</h2>
+                    <button class="close-btn" id="btn-close-modal">&times;</button>
+                </div>
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label for="input-pat">
+                            GitHub Personal Access Token (PAT)
+                            <span class="tooltip" title="For private repositories. Needs 'repo' scope (classic) or read access to contents (fine-grained).">?</span>
+                        </label>
+                        <input type="password" id="input-pat" placeholder="ghp_************************************" required autocomplete="off">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="input-owner">Repo Owner / Username</label>
+                            <input type="text" id="input-owner" placeholder="e.g. my-github-username" required autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="input-repo">Repository Name</label>
+                            <input type="text" id="input-repo" placeholder="e.g. snowflake-ddl-repo" required autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="input-branch">Branch</label>
+                            <input type="text" id="input-branch" placeholder="main" value="main" required autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="input-api-url">
+                                API Base URL
+                                <span class="tooltip" title="Use default for public GitHub. Change only for corporate GitHub Enterprise Server.">?</span>
+                            </label>
+                            <input type="url" id="input-api-url" placeholder="https://api.github.com" value="https://api.github.com" required autocomplete="off">
+                        </div>
+                    </div>
+                    
+                    <div id="settings-error" class="alert alert-danger" style="display: none;"></div>
+                    <div id="settings-success" class="alert alert-success" style="display: none;">Connection successful!</div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="secondary-btn" id="btn-cancel-settings">Cancel</button>
+                        <button type="submit" class="primary-btn" id="btn-save-settings">
+                            <span class="btn-text">Test & Save Connection</span>
+                            <span class="btn-spinner" style="display: none;"><div class="spinner-small"></div></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast">
+            <span id="toast-message">Copied to clipboard!</span>
+        </div>
+    </div>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PrismJS Core and SQL Syntax Highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+    <!-- App Script -->
+    <script src="app.js"></script>
+</body>
+</html>
